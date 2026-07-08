@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// CANDIDATES
+// ============================================================
+
+model Candidate {
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  email         String?
+  name          String
+  location      String?
+  status        String   @default("onboarding") // onboarding | active | paused
+  rawCvText     String?
+  cvFileName    String?
+  cvInputMethod String?                       // upload | paste
+  parsedProfile Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  qualifications CandidateQualification[]
+  skills         CandidateSkill[]
+  trajectories   CandidateTrajectory[]
+  experience     CandidateExperience[]
+  matches        JobMatch[]
+  notifications  CandidateNotification[]
+}
+
+model CandidateQualification {
+  id          String   @id @default(cuid())
+  candidateId String
+  type        String   // certificate | diploma | bachelors_degree | postgraduate_diploma | masters_degree | phd | certification
+  field       String
+  fieldTag    String?  // leaf tag e.g. "business_administration"
+  parentField String?  // parent category e.g. "business_operations"
+  institution String?
+  year        String?
+  confidence  Float?
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model CandidateSkill {
+  id          String   @id @default(cuid())
+  candidateId String
+  skill       String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([candidateId, skill])
+}
+
+model CandidateExperience {
+  id            String   @id @default(cuid())
+  candidateId   String
+  title         String
+  company       String
+  period        String?
+  durationYears Float?
+  industry      String?
+  seniority     String?  // entry | mid | senior | executive
+  isCurrent     Boolean  @default(false)
+  candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+}
+
+model CandidateTrajectory {
+  id            String  @id @default(cuid())
+  candidateId   String
+  trajectory    String  // leaf tag e.g. "microfinance_sacco"
+  parentField   String  // parent category e.g. "microfinance_sacco"
+  role          String  // primary | secondary
+  yearsInField  Float?
+  candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([candidateId, role])
+}
+
+// ============================================================
+// JOBS
+// ============================================================
+
+model Job {
+  id               String   @id @default(cuid())
+  title            String
+  company          String
+  location         String?
+  employmentType   String?  // full-time | part-time | contract | locum
+  sourceUrl        String?
+  sourceType       String?  // scraper | manual | employer_dashboard
+  status           String   @default("active") // active | closed | expired
+  rawDescription   String?
+  parsedJob        Json?
+  fieldTag         String?
+  parentFields     String   @default("[]")  // JSON array of parent categories
+  requiredQualLevel String?
+  requiredSkills   String   @default("[]")  // JSON array
+  preferredSkills  String   @default("[]")  // JSON array
+  experienceReq    String?
+  seniority        String?
+  postedAt         DateTime @default(now())
+  expiresAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  matches JobMatch[]
+}
+
+// ============================================================
+// MATCHES
+// ============================================================
+
+model JobMatch {
+  id          String    @id @default(cuid())
+  candidateId String
+  jobId       String
+  matchedVia  String    // primary | secondary
+  matchParents String   // JSON array of matching parent fields
+  score       Float     // 0.0 - 1.0
+  qualFit     Float
+  skillFit    Float
+  expFit      Float
+  status      String    @default("new") // new | viewed | dismissed | applied
+  dismissedAt DateTime?
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([candidateId, jobId])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model CandidateNotification {
+  id          String    @id @default(cuid())
+  candidateId String
+  type        String    // new_matches | profile_reminder | system
+  channel     String    // whatsapp | email
+  content     String
+  status      String    @default("pending") // pending | sent | failed
+  sentAt      DateTime?
+  error       String?
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+// ============================================================
+// FIELD TAXONOMY
+// ============================================================
+
+model FieldTaxonomy {
+  id          String  @id @default(cuid())
+  parent      String
+  leafTag     String
+  label       String
+  description String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([parent, leafTag])
+}
